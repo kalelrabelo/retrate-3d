@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Retrate | Montanha Cinematográfica Neve Realista</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; overflow: hidden;
+      width: 100vw; height: 100vh;
+      background-color: #cfe8ff;
+      font-family: sans-serif;
+    }
+    #container { width: 100vw; height: 100vh; }
+  </style>
+</head>
+<body>
+<div id="container"></div>
+
+<!-- THREE.js + Controles + GLTFLoader -->
+<script src="https://cdn.jsdelivr.net/npm/three@0.123.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.123.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.123.0/examples/js/loaders/GLTFLoader.js"></script>
+
+<script>
+  const container = document.getElementById('container');
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
+  camera.position.set(200, 150, 200);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.04;
+  controls.minDistance = 50;
+  controls.maxDistance = 2000;
+  controls.rotateSpeed = 0.3;
+  controls.zoomSpeed = 0.5;
+  controls.panSpeed = 0.2;
+
+  // Luz ambiente de dia
+  const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+  scene.add(ambientLight);
+
+  const sun = new THREE.DirectionalLight(0xffffff, 1);
+  sun.position.set(100, 200, 100);
+  scene.add(sun);
+
+  // Fog de dia
+  scene.fog = new THREE.FogExp2(0xdef0ff, 0.002);
+
+  // Load Texturas
+  const texLoader = new THREE.TextureLoader();
+  const albedo = texLoader.load('assets/textures/Imagesnow_diffuse.png');
+  const normal = texLoader.load('assets/textures/Imagerock_normal.png');
+  const ao = texLoader.load('assets/textures/Imagehomepage-lightmap.png');
+  const roughness = texLoader.load('assets/textures/snowRockMix.png');
+  const noise = texLoader.load('assets/textures/Imagenoise.png');
+  const perlin = texLoader.load('assets/textures/ImageperlinNoise.png');
+  const solid = texLoader.load('assets/textures/Imagenoise-solid-normal.png');
+  const voronoi = texLoader.load('assets/textures/Imagevoronoi.png');
+
+  // Corrige orientação
+  [albedo, normal, ao, roughness, noise, perlin, solid, voronoi].forEach(tex => tex.flipY = false);
+
+  // Carregar montanha
+  const gltfLoader = new THREE.GLTFLoader();
+  gltfLoader.load('assets/mountains.glb', (gltf) => {
+    const model = gltf.scene;
+
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry.computeVertexNormals();
+        if (!child.geometry.attributes.uv2 && child.geometry.attributes.uv) {
+          child.geometry.setAttribute('uv2', child.geometry.attributes.uv);
+        }
+
+        child.material = new THREE.MeshStandardMaterial({
+          map: albedo,
+          normalMap: normal,
+          aoMap: ao,
+          roughnessMap: roughness,
+          metalness: 0.1,
+          roughness: 0.9,
+          aoMapIntensity: 1.2,
+          displacementMap: noise,
+          displacementScale: 0.05,
+        });
+
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+
+    model.scale.set(1.3, 1.3, 1.3);
+    model.position.set(0, -40, 0);
+    scene.add(model);
+  });
+
+  // Nuvens (sprites)
+  const cloudTexture = texLoader.load('assets/textures/Imagevoronoi.png');
+  const clouds = [];
+
+  for (let i = 0; i < 30; i++) {
+    const material = new THREE.SpriteMaterial({
+      map: cloudTexture,
+      transparent: true,
+      opacity: 0.15,
+      depthWrite: false
+    });
+
+    const sprite = new THREE.Sprite(material);
+    sprite.position.set(
+      (Math.random() - 0.5) * 600,
+      Math.random() * 120 + 50,
+      (Math.random() - 0.5) * 600
+    );
+    const scale = Math.random() * 150 + 150;
+    sprite.scale.set(scale, scale * 0.6, 1);
+    scene.add(sprite);
+    clouds.push(sprite);
+  }
+
+  // Animação
+  function animate() {
+    requestAnimationFrame(animate);
+    clouds.forEach(c => {
+      c.position.x += 0.05 * Math.sin(Date.now() * 0.0001);
+    });
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+</body>
+</html>
